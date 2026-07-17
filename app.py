@@ -95,7 +95,7 @@ def main():
             total_pedido_dia = calcular_total_pedido_dia(base)
             lojas_pend, produtos_pend = gerar_pendencias_depara(base)
             excel_completo_bytes = gerar_excel(base, nota_final, validacoes, lojas, produtos, resumo, config_grade, controle_extracao)
-            nota_final_bytes = gerar_excel_nota_final(nota_final, total_pedido_dia, cliente_nome)
+            nota_final_bytes = gerar_excel_nota_final(nota_final, base, total_pedido_dia, cliente_nome)
     except Exception as exc:
         st.error(str(exc))
         st.stop()
