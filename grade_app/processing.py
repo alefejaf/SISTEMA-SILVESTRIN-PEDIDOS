@@ -294,18 +294,16 @@ def gerar_grade(base: pd.DataFrame, grade_cols: List[str]) -> pd.DataFrame:
     pivo = pivo[grade_cols]
     pivo["TOTAL"] = pivo.sum(axis=1)
 
-    # Regra do preço: priorizar o preço praticado pelas lojas normais (comuns).
-    # O preço da loja de referência só é usado como fallback se o produto for exclusivo dela.
-    base_comum = base_ok[~base_ok["Usar preço referência"].apply(eh_sim) & base_ok["Preço unitário"].gt(0)]
-    precos_comuns = base_comum.groupby("Produto padronizado")["Preço unitário"].first()
+    # Regra do preço: prioriza os preços de lojas normais. O preço da loja de referência
+    # só é utilizado se o produto não tiver preço em nenhuma das lojas normais.
+    base_normal = base_ok[~base_ok["Usar preço referência"].apply(eh_sim) & base_ok["Preço unitário"].gt(0)]
+    base_ref = base_ok[base_ok["Usar preço referência"].apply(eh_sim) & base_ok["Preço unitário"].gt(0)]
 
-    base_preco_ref = obter_base_preco_referencia(base_ok)
-    if not base_preco_ref.empty:
-        precos_ref = base_preco_ref.groupby("Produto padronizado")["Preço unitário"].first()
-    else:
-        precos_ref = pd.Series(dtype=float)
+    precos_normais = base_normal.groupby("Produto padronizado")["Preço unitário"].first()
+    precos_ref = base_ref.groupby("Produto padronizado")["Preço unitário"].first()
 
-    precos_final = precos_comuns.combine_first(precos_ref)
+    # Une as séries priorizando precos_normais e usando precos_ref como fallback para itens ausentes nas normais
+    precos_final = precos_normais.combine_first(precos_ref)
     pivo["PREÇO"] = pivo.index.map(precos_final).fillna(0)
     pivo = pivo.reset_index().rename(columns={"Produto padronizado": "Produto"})
     pivo = pivo.sort_values("Produto").reset_index(drop=True)
