@@ -294,16 +294,18 @@ def gerar_grade(base: pd.DataFrame, grade_cols: List[str]) -> pd.DataFrame:
     pivo = pivo[grade_cols]
     pivo["TOTAL"] = pivo.sum(axis=1)
 
-    # Regra do preço: primeiro busca a loja configurada como referência; se o produto não tiver
-    # preço nessa loja, usa o primeiro preço válido encontrado no PDF como fallback.
+    # Regra do preço: priorizar o preço praticado pelas lojas normais (comuns).
+    # O preço da loja de referência só é usado como fallback se o produto for exclusivo dela.
+    base_comum = base_ok[~base_ok["Usar preço referência"].apply(eh_sim) & base_ok["Preço unitário"].gt(0)]
+    precos_comuns = base_comum.groupby("Produto padronizado")["Preço unitário"].first()
+
     base_preco_ref = obter_base_preco_referencia(base_ok)
-    precos_fallback = base_ok[base_ok["Preço unitário"].gt(0)].groupby("Produto padronizado")["Preço unitário"].first()
     if not base_preco_ref.empty:
         precos_ref = base_preco_ref.groupby("Produto padronizado")["Preço unitário"].first()
-        precos_final = precos_fallback.copy()
-        precos_final.update(precos_ref)
     else:
-        precos_final = precos_fallback
+        precos_ref = pd.Series(dtype=float)
+
+    precos_final = precos_comuns.combine_first(precos_ref)
     pivo["PREÇO"] = pivo.index.map(precos_final).fillna(0)
     pivo = pivo.reset_index().rename(columns={"Produto padronizado": "Produto"})
     pivo = pivo.sort_values("Produto").reset_index(drop=True)
@@ -343,3 +345,4 @@ def gerar_pendencias_depara(base: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFr
         prod_pend["Nome oficial na grade"] = prod_pend["Nome do produto no PDF"]
         prod_pend = prod_pend[["Nome do produto no PDF", "Nome oficial na grade", "Unidade"]]
     return lojas_pend.reset_index(drop=True), prod_pend.reset_index(drop=True)
+
